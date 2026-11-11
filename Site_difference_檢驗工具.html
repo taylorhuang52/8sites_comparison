@@ -88,12 +88,17 @@ function parseCSV(text,store){
   let hi=-1;
   for(let i=0;i<L.length&&i<80;i++){ if(/^"?Serial#/.test(L[i])){hi=i;break} }
   if(hi<0) return false;
-  let ni=-1;
-  for(let i=0;i<hi;i++){ const c=splitLine(L[i]); if(c.length>8 && /Test Time/i.test(c[6]||'')){ni=i;break} }
+  /* 版面：[測項名][單位][空白][上限][下限][Serial# 標題列]；不依賴固定的第一個測項名稱 */
+  const isName=c=>c.length>7&&c.slice(0,6).every(x=>!x.trim())&&(c[6]||'').trim()!==''&&isNaN(+c[6]);
+  let ni=hi-5;
+  if(ni<0||!isName(splitLine(L[ni]))){
+    ni=-1;
+    for(let i=hi-1;i>=Math.max(0,hi-12);i--){ if(isName(splitLine(L[i]))){ni=i;break} }
+  }
   if(ni<0) return false;
   const names=splitLine(L[ni]).map(s=>s.trim());
   const units=splitLine(L[ni+1]||'');
-  const hiL=splitLine(L[ni+3]||''), loL=splitLine(L[ni+4]||'');
+  const hiL=splitLine(L[hi-2]||''), loL=splitLine(L[hi-1]||'');
   const w=(L.slice(0,30).join('\n').match(/Wafer ID\s*:?\s*([^\s,"]+)/i)||[])[1]||('wafer'+store.nw);
   const lot=w.split('-')[0];
   store.nw++;
@@ -133,7 +138,7 @@ async function load(files){
   try{
     for(const f of files) await readEntry(f.name,()=>f.arrayBuffer(),store);
   }catch(e){ $('msg').textContent='讀檔失敗：'+e.message; return }
-  if(!store.files){ $('msg').textContent='找不到可辨識的測試 CSV（需含 Serial# 標題列與 Test Time 欄）。'; return }
+  if(!store.files){ $('msg').textContent='找不到可辨識的測試 CSV（需含 Serial# 標題列，且其上方有測項名稱列）。'; return }
   for(const t of store.tests) while(t.vals.length<store.site.length) t.vals.push(NaN);
   D=store;
   const lots=[...new Set(D.lot)].sort();
@@ -193,7 +198,7 @@ function render(){
   rows.forEach(r=>{r.name=r.t.name;r.flag=level(r)});
   let v=rows.filter(r=>!$('only').checked||r.flag>0);
   v.sort((a,b)=>{const x=a[sortKey],y=b[sortKey];const nx=x!==x,ny=y!==y;if(nx||ny)return nx-ny;return (typeof x==='string'?x.localeCompare(y):x-y)*sortDir});
-  $('tb').tBodies[0].innerHTML=v.map(r=>`<tr data-n="${r.name.replace(/"/g,'&quot;')}" class="${selTest===r.name?'sel':''}"><td class="l">${r.name}${r.t.unit?` <span style="color:var(--mute)">(${r.t.unit})</span>`:''}</td><td>${r.N}</td><td>Site ${r.worst}</td><td>${(r.off>0?'+':'')+fmt(r.off)}</td><td>${fmt(r.delta)}</td><td>${fmt(r.sp)}</td><td>${r.score>=999?'∞':r.score.toFixed(2)}</td><td>${r.specPct===r.specPct?r.specPct.toFixed(1):'–'}</td><td>${r.eta.toFixed(3)}</td><td><span class="f ${['ok','mid','hi'][r.flag]}">${['正常','注意','過大'][r.flag]}</span></td></tr>`).join('')||'<tr><td class="l" colspan="10">沒有符合條件的測項</td></tr>';
+  $('tb').tBodies[0].innerHTML=v.map(r=>`<tr data-n="${r.name.replace(/"/g,'&quot;')}" class="${selTest===r.name?'sel':''}"><td class="l">${r.name}${r.t.unit&&r.t.unit.length<=10?` <span style="color:var(--mute)">(${r.t.unit})</span>`:''}</td><td>${r.N}</td><td>Site ${r.worst}</td><td>${(r.off>0?'+':'')+fmt(r.off)}</td><td>${fmt(r.delta)}</td><td>${fmt(r.sp)}</td><td>${r.score>=999?'∞':r.score.toFixed(2)}</td><td>${r.specPct===r.specPct?r.specPct.toFixed(1):'–'}</td><td>${r.eta.toFixed(3)}</td><td><span class="f ${['ok','mid','hi'][r.flag]}">${['正常','注意','過大'][r.flag]}</span></td></tr>`).join('')||'<tr><td class="l" colspan="10">沒有符合條件的測項</td></tr>';
   const n=rows.filter(r=>r.flag>0).length; $('res').querySelector('.note').dataset.n=n;
   if(selTest) detail(selTest);
 }
