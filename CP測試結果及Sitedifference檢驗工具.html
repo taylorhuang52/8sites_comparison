@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CP 測試結果及Site difference 檢驗工具</title>
+<style>
+:root{--bg:#f3f5f7;--panel:#fff;--ink:#17212b;--mute:#667385;--line:#d9dfe6;--acc:#0b6bcb;--bad:#c2410c;--badbg:#ffedd5;--warn:#a16207;--warnbg:#fef3c7;--ok:#2f7d4f;--box:#9db8d6;color-scheme:light;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f151c;--panel:#18212b;--ink:#e6ebf1;--mute:#93a1b2;--line:#2b3846;--acc:#5aa9f5;--bad:#fb923c;--badbg:#3b2312;--warn:#facc15;--warnbg:#33290c;--ok:#5fc08a;--box:#35597f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f151c;--panel:#18212b;--ink:#e6ebf1;--mute:#93a1b2;--line:#2b3846;--acc:#5aa9f5;--bad:#fb923c;--badbg:#3b2312;--warn:#facc15;--warnbg:#33290c;--ok:#5fc08a;--box:#35597f;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI","Noto Sans TC","PingFang TC",system-ui,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:14px}
+#drop{border:2px dashed var(--line);border-radius:6px;padding:22px;text-align:center;color:var(--mute);cursor:pointer}
+#drop.on{border-color:var(--acc);color:var(--acc)}
+.ctl{display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center}
+.ctl label{display:flex;gap:6px;align-items:center}
+input[type=number],select{font:inherit;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:3px 6px;width:76px}
+select{width:auto}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+th{cursor:pointer;color:var(--mute);font-weight:600;user-select:none}
+th.s{color:var(--acc)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--bg)}
+tr.sel{outline:2px solid var(--acc);outline-offset:-2px}
+.f{display:inline-block;padding:0 8px;border-radius:10px;font-size:12px}
+.f.hi{background:var(--badbg);color:var(--bad)}.f.mid{background:var(--warnbg);color:var(--warn)}.f.ok{color:var(--ok)}
+#msg{color:var(--mute);margin:8px 0 0}
+#detail h2{font-size:16px;margin:0 0 8px}
+svg{max-width:100%;height:auto;display:block}
+svg text{fill:var(--mute);font-size:11px}
+.note{color:var(--mute);font-size:12px;margin-top:8px}
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.tabs button{font:inherit;background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);padding:8px 14px;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--acc);font-weight:600}
+.bar{display:inline-block;height:8px;border-radius:2px;vertical-align:middle;margin-left:6px;background:var(--bad)}
+.bar.y{background:var(--box)}
+.scr{max-height:380px;overflow:auto}
+.kv{color:var(--mute);margin:0 0 10px}
+.btn{font:inherit;background:var(--acc);color:var(--panel);border:0;border-radius:4px;padding:5px 12px;cursor:pointer}
+.btn:hover{opacity:.9}
+#wd tr[data-ti]{cursor:pointer}
+#wd tr[data-ti]:hover{background:var(--bg)}
+.hmbox{margin-top:16px;padding-top:12px;border-top:2px solid var(--line)}
+.hmbox .ctl{margin:6px 0}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+<h1>CP 測試結果及Site difference 檢驗工具</h1>
+<p class="sub">載入 wafer 測試 CSV（可直接放 .zip，含巢狀 zip），快速找出各測項中 site 間差異過大的項目。資料只在瀏覽器內處理，不會上傳。</p>
+
+<div class="panel">
+ <div id="drop" tabindex="0" role="button">把 .csv / .zip 拖到這裡，或點擊選檔</div>
+ <input id="file" type="file" multiple accept=".csv,.zip" hidden>
+ <p id="msg"></p>
+</div>
+
+<div class="tabs" role="tablist"><button role="tab" id="tab1" aria-selected="true">Site difference</button><button role="tab" id="tab2" aria-selected="false">Wafer 良率 / 測項 fail rate</button></div>
+<div id="v1">
+<div class="panel ctl" id="ctl" hidden>
+ <label>Lot <select id="lot"></select></label>
+ <label><input type="checkbox" id="b1"> 只算 Bin1 good die</label>
+ <label>Δ/σ 門檻 <input type="number" id="t1" value="0.5" step="0.1" min="0"></label>
+ <label>Δ/Spec 門檻 % <input type="number" id="t2" value="5" step="1" min="0"></label>
+ <label><input type="checkbox" id="only"> 只顯示超標項目</label>
+</div>
+
+<div class="panel" id="res" hidden>
+ <div style="text-align:right;margin-bottom:8px"><button class="btn" id="xs">匯出 Excel</button></div>
+ <div class="tw"><table id="tb"><thead></thead><tbody></tbody></table></div>
+ <p class="note">Δ = 各 site 中位數的最大值減最小值；σ = site 內合併標準差；Δ/Spec = Δ 除以 (上限 − 下限)；η² = site 造成的變異佔總變異比例。點選任一列看各 site 的 box plot。</p>
+</div>
+
+<div class="panel" id="detail" hidden></div>
+</div>
+
+<div id="v2" hidden>
+ <div class="panel">
+  <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><p class="kv" id="wsum">請先載入資料。</p><button class="btn" id="xw">匯出 Excel</button></div>
+  <div class="tw scr"><table id="wt"><thead><tr><th class="l">#</th><th class="l">Wafer</th><th>Die 數</th><th>Pass (Bin1)</th><th>Fail</th><th>良率 %（低 → 高）</th></tr></thead><tbody></tbody></table></div>
+  <p class="note">良率 = Bin1 die 數 ÷ 該片 wafer 全部 die 數，由低到高排列。點選任一片 wafer 看各測項 failure rate。</p>
+ </div>
+ <div class="panel" id="wd" hidden></div>
+</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+let D=null, rows=[], sortKey='score', sortDir=-1, selTest=null;
+
+/* ---------- parsing ---------- */
+function splitLine(l){
+  if(l.indexOf('"')<0) return l.split(',');
+  const o=[];let c='',q=false;
+  for(let i=0;i<l.length;i++){const ch=l[i];
+    if(ch==='"'){ if(q&&l[i+1]==='"'){c+='"';i++} else q=!q }
+    else if(ch===','&&!q){o.push(c);c=''} else c+=ch }
+  o.push(c);return o;
+}
+const num=s=>{if(s==null||s==='')return NaN;const v=+s;return isFinite(v)?v:NaN};
+function parseCSV(text,store){
+  const L=text.split(/\r?\n/);
+  let hi=-1;
+  for(let i=0;i<L.length&&i<80;i++){ if(/^"?Serial#/.test(L[i])){hi=i;break} }
+  if(hi<0) return false;
+  /* 版面：[測項名][單位][空白][上限][下限][Serial# 標題列]；不依賴固定的第一個測項名稱 */
+  const isName=c=>c.length>7&&c.slice(0,6).every(x=>!x.trim())&&(c[6]||'').trim()!==''&&isNaN(+c[6]);
+  let ni=hi-5;
+  if(ni<0||!isName(splitLine(L[ni]))){
+    ni=-1;
+    for(let i=hi-1;i>=Math.max(0,hi-12);i--){ if(isName(splitLine(L[i]))){ni=i;break} }
+  }
+  if(ni<0) return false;
+  const names=splitLine(L[ni]).map(s=>s.trim());
+  const units=splitLine(L[ni+1]||'');
+  const hiL=splitLine(L[hi-2]||''), loL=splitLine(L[hi-1]||'');
+  const w=(L.slice(0,30).join('\n').match(/Wafer ID\s*:?\s*([^\s,"]+)/i)||[])[1]||('wafer'+store.nw);
+  const lot=w.split('-')[0];
+  store.nw++;
+  for(let i=6;i<names.length;i++){
+    if(!names[i]) continue;
+    let t=store.tests.find(x=>x.name===names[i]);
+    if(!t){t={name:names[i],unit:(units[i]||'').trim(),hi:num(hiL[i]),lo:num(loL[i]),vals:[]};store.tests.push(t)}
+    t.idx=t.idx||{};t.idx[w]=i;
+  }
+  const start=store.site.length;
+  const cols=[];
+  for(let r=hi+1;r<L.length;r++){
+    const l=L[r]; if(!l||l.charCodeAt(0)<48||l.charCodeAt(0)>57) continue;
+    const c=splitLine(l);
+    store.site.push(+c[1]);store.bin.push(+c[2]);store.lot.push(lot);store.wafer.push(w);store.x.push(+c[4]);store.y.push(+c[5]);
+    cols.push(c);
+  }
+  for(const t of store.tests){
+    const i=t.idx&&t.idx[w];
+    while(t.vals.length<start) t.vals.push(NaN);
+    for(const c of cols) t.vals.push(i==null?NaN:num(c[i]));
+  }
+  return true;
+}
+async function readEntry(name,getBuf,store){
+  if(/\.zip$/i.test(name)){
+    const z=await JSZip.loadAsync(await getBuf());
+    for(const n of Object.keys(z.files)){ const f=z.files[n]; if(!f.dir && !/__MACOSX/.test(n)) await readEntry(n,()=>f.async('arraybuffer'),store) }
+  } else if(/\.csv$/i.test(name)){
+    const ok=parseCSV(new TextDecoder('windows-1252').decode(await getBuf()),store);
+    if(ok) store.files++; else store.skipped.push(name);
+  }
+}
+async function load(files){
+  $('msg').textContent='解析中…';
+  const store={tests:[],site:[],bin:[],lot:[],wafer:[],x:[],y:[],nw:0,files:0,skipped:[]};
+  try{
+    for(const f of files) await readEntry(f.name,()=>f.arrayBuffer(),store);
+  }catch(e){ $('msg').textContent='讀檔失敗：'+e.message; return }
+  if(!store.files){ $('msg').textContent='找不到可辨識的測試 CSV（需含 Serial# 標題列，且其上方有測項名稱列）。'; return }
+  for(const t of store.tests) while(t.vals.length<store.site.length) t.vals.push(NaN);
+  D=store;
+  const lots=[...new Set(D.lot)].sort();
+  $('lot').innerHTML='<option value="">全部 ('+lots.length+' lots)</option>'+lots.map(x=>`<option>${x}</option>`).join('');
+  $('msg').textContent=`已載入 ${D.files} 個檔案、${D.nw} 片 wafer、${D.site.length.toLocaleString()} 顆 die、${D.tests.length} 個測項`+(D.skipped.length?`；略過 ${D.skipped.length} 個無法辨識的檔案`:'');
+  ['ctl','res'].forEach(i=>$(i).hidden=false);
+  selTest=null;$('detail').hidden=true;
+  analyze();wafers();
+}
+
+/* ---------- stats ---------- */
+function q(a,p){const i=(a.length-1)*p,f=Math.floor(i),c=Math.ceil(i);return a[f]+(a[c]-a[f])*(i-f)}
+function siteStats(t,mask){
+  const g={};
+  for(let i=0;i<t.vals.length;i++){ const v=t.vals[i]; if(v!==v||!mask(i)) continue; (g[D.site[i]]=g[D.site[i]]||[]).push(v) }
+  const out=[];
+  for(const s of Object.keys(g).map(Number).sort((a,b)=>a-b)){
+    const a=g[s].sort((x,y)=>x-y), n=a.length, m=a.reduce((x,y)=>x+y,0)/n;
+    const sd=n>1?Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/(n-1)):0;
+    const med=q(a,.5),q1=q(a,.25),q3=q(a,.75),iqr=q3-q1;
+    const wl=a.find(v=>v>=q1-1.5*iqr),wh=[...a].reverse().find(v=>v<=q3+1.5*iqr);
+    let f=0; if(t.lo===t.lo||t.hi===t.hi) for(const v of a) if((t.lo===t.lo&&v<t.lo)||(t.hi===t.hi&&v>t.hi)) f++;
+    out.push({site:s,n,mean:m,sd,med,q1,q3,wl,wh,f});
+  }
+  return out;
+}
+function analyze(){
+  const lot=$('lot').value, b1=$('b1').checked;
+  const mask=i=>(!lot||D.lot[i]===lot)&&(!b1||D.bin[i]===1);
+  rows=[];
+  for(const t of D.tests){
+    const st=siteStats(t,mask).filter(s=>s.n>=5);
+    if(st.length<2) continue;
+    const N=st.reduce((x,s)=>x+s.n,0);
+    const meds=st.map(s=>s.med), delta=Math.max(...meds)-Math.min(...meds);
+    const dof=N-st.length, sp=dof>0?Math.sqrt(st.reduce((x,s)=>x+(s.n-1)*s.sd*s.sd,0)/dof):0;
+    const gm=st.reduce((x,s)=>x+s.mean*s.n,0)/N;
+    const ssb=st.reduce((x,s)=>x+s.n*(s.mean-gm)**2,0), ssw=st.reduce((x,s)=>x+(s.n-1)*s.sd*s.sd,0);
+    const spec=(t.hi===t.hi&&t.lo===t.lo&&t.hi>t.lo)?t.hi-t.lo:NaN;
+    const score=sp>0?delta/sp:(delta>0?999:0);
+    const mean=meds.reduce((x,y)=>x+y,0)/meds.length;
+    let worst=st[0]; for(const s of st) if(Math.abs(s.med-mean)>Math.abs(worst.med-mean)) worst=s;
+    rows.push({t,st,N,delta,sp,score,specPct:spec===spec?delta/spec*100:NaN,eta:ssb+ssw>0?ssb/(ssb+ssw):0,worst:worst.site,off:worst.med-mean});
+  }
+  render();
+}
+
+/* ---------- table ---------- */
+const COLS=[['name','測項','l'],['N','N'],['worst','偏離最大 site'],['off','該 site 偏移'],['delta','Δ'],['sp','σ(site 內)'],['score','Δ/σ'],['specPct','Δ/Spec %'],['eta','η²'],['flag','判定']];
+const fmt=v=>v!==v?'–':(v===0?'0':Math.abs(v)>=1000||Math.abs(v)<0.001?v.toExponential(2):(+v.toPrecision(4)).toString());
+function level(r){
+  const a=+$('t1').value,b=+$('t2').value;
+  const x=r.score>=a*2||(r.specPct===r.specPct&&r.specPct>=b*2), y=r.score>=a||(r.specPct===r.specPct&&r.specPct>=b);
+  return x?2:(y?1:0);
+}
+function render(){
+  const th=$('tb').tHead; th.innerHTML='<tr>'+COLS.map(c=>`<th class="${c[2]||''} ${sortKey===c[0]?'s':''}" data-k="${c[0]}">${c[1]}${sortKey===c[0]?(sortDir>0?' ▲':' ▼'):''}</th>`).join('')+'</tr>';
+  rows.forEach(r=>{r.name=r.t.name;r.flag=level(r)});
+  let v=rows.filter(r=>!$('only').checked||r.flag>0);
+  v.sort((a,b)=>{const x=a[sortKey],y=b[sortKey];const nx=x!==x,ny=y!==y;if(nx||ny)return nx-ny;return (typeof x==='string'?x.localeCompare(y):x-y)*sortDir});
+  $('tb').tBodies[0].innerHTML=v.map(r=>`<tr data-n="${r.name.replace(/"/g,'&quot;')}" class="${selTest===r.name?'sel':''}"><td class="l">${r.name}${r.t.unit&&r.t.unit.length<=10?` <span style="color:var(--mute)">(${r.t.unit})</span>`:''}</td><td>${r.N}</td><td>Site ${r.worst}</td><td>${(r.off>0?'+':'')+fmt(r.off)}</td><td>${fmt(r.delta)}</td><td>${fmt(r.sp)}</td><td>${r.score>=999?'∞':r.score.toFixed(2)}</td><td>${r.specPct===r.specPct?r.specPct.toFixed(1):'–'}</td><td>${r.eta.toFixed(3)}</td><td><span class="f ${['ok','mid','hi'][r.flag]}">${['正常','注意','過大'][r.flag]}</span></td></tr>`).join('')||'<tr><td class="l" colspan="10">沒有符合條件的測項</td></tr>';
+  const n=rows.filter(r=>r.flag>0).length; $('res').querySelector('.note').dataset.n=n;
+  if(selTest) detail(selTest);
+}
+
+/* ---------- detail box plot ---------- */
+function detail(name){
+  selTest=name;
+  const r=rows.find(x=>x.t.name===name); if(!r){$('detail').hidden=true;return}
+  const t=r.t, st=r.st;
+  let lo=Math.min(...st.map(s=>s.wl)), hi=Math.max(...st.map(s=>s.wh));
+  const span=(hi-lo)||Math.abs(hi)||1;
+  const lines=[]; for(const [v,l] of [[t.lo,'LSL'],[t.hi,'USL']]) if(v===v&&v>=lo-span*3&&v<=hi+span*3){lines.push([v,l]);lo=Math.min(lo,v);hi=Math.max(hi,v)}
+  const pad=(hi-lo)*.08||1; lo-=pad;hi+=pad;
+  const W=Math.max(520,st.length*70+90),H=280,L=62,R=14,T=14,B=34, pw=(W-L-R)/st.length;
+  const y=v=>T+(H-T-B)*(1-(v-lo)/(hi-lo));
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${name} 各 site box plot">`;
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4;s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${fmt(v)}</text>`}
+  for(const [v,l] of lines) s+=`<line x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--bad)" stroke-dasharray="5 4"/><text x="${W-R}" y="${y(v)-3}" text-anchor="end" style="fill:var(--bad)">${l} ${fmt(v)}</text>`;
+  const gm=r.st.map(x=>x.med).reduce((a,b)=>a+b,0)/st.length;
+  s+=`<line x1="${L}" x2="${W-R}" y1="${y(gm)}" y2="${y(gm)}" stroke="var(--acc)" stroke-dasharray="2 3"/>`;
+  st.forEach((o,i)=>{const cx=L+pw*(i+.5),bw=Math.min(34,pw*.55),bad=o.site===r.worst;
+    s+=`<line x1="${cx}" x2="${cx}" y1="${y(o.wl)}" y2="${y(o.wh)}" stroke="var(--mute)"/><rect x="${cx-bw/2}" y="${y(o.q3)}" width="${bw}" height="${Math.max(1,y(o.q1)-y(o.q3))}" fill="${bad?'var(--bad)':'var(--box)'}" fill-opacity="${bad?.55:.8}" stroke="var(--mute)"/><line x1="${cx-bw/2}" x2="${cx+bw/2}" y1="${y(o.med)}" y2="${y(o.med)}" stroke="var(--ink)" stroke-width="2"/><text x="${cx}" y="${H-16}" text-anchor="middle">Site ${o.site}</text><text x="${cx}" y="${H-3}" text-anchor="middle">n=${o.n}</text>`});
+  s+='</svg>';
+  const tab=`<div class="tw"><table><thead><tr><th>Site</th><th>N</th><th>中位數</th><th>平均</th><th>σ</th><th>與全 site 中位數均值差</th><th>超出 spec 顆數</th></tr></thead><tbody>${st.map(o=>`<tr><td>Site ${o.site}</td><td>${o.n}</td><td>${fmt(o.med)}</td><td>${fmt(o.mean)}</td><td>${fmt(o.sd)}</td><td>${(o.med-gm>0?'+':'')+fmt(o.med-gm)}</td><td>${o.f}</td></tr>`).join('')}</tbody></table></div>`;
+  $('detail').hidden=false;
+  $('detail').innerHTML=`<h2>${name}${t.unit?' ('+t.unit+')':''}</h2>${s}<p class="note">方塊 = Q1~Q3，黑線 = 中位數，鬚 = 1.5 IQR 內最遠值，藍虛線 = 各 site 中位數均值，橘色方塊 = 偏離最大的 site。</p>${tab}`;
+}
+
+/* ---------- wafer yield view ---------- */
+let WL=[],selW=null;
+function wafers(){
+  const m={};
+  for(let i=0;i<D.site.length;i++){const w=D.wafer[i];const o=m[w]||(m[w]={w,lot:D.lot[i],n:0,p:0,idx:[]});o.n++;if(D.bin[i]===1)o.p++;o.idx.push(i)}
+  WL=Object.values(m);WL.forEach(o=>o.y=o.p/o.n*100);
+  WL.sort((a,b)=>a.y-b.y||a.w.localeCompare(b.w));
+  const tn=WL.reduce((x,o)=>x+o.n,0),tp=WL.reduce((x,o)=>x+o.p,0);
+  $('wsum').textContent=`共 ${WL.length} 片 wafer，整體良率 ${(tp/tn*100).toFixed(2)}%（最低 ${WL[0].w}：${WL[0].y.toFixed(2)}%，最高 ${WL[WL.length-1].w}：${WL[WL.length-1].y.toFixed(2)}%）`;
+  $('wt').tBodies[0].innerHTML=WL.map((o,i)=>`<tr data-w="${o.w}" class="${selW===o.w?'sel':''}"><td class="l">${i+1}</td><td class="l">${o.w}</td><td>${o.n}</td><td>${o.p}</td><td>${o.n-o.p}</td><td>${o.y.toFixed(2)}<span class="bar y" style="width:${o.y*0.8}px"></span></td></tr>`).join('');
+  $('wd').hidden=true;selW=null;
+}
+function wtests(o){
+  const R=[];
+  for(const t of D.tests){
+    const hasL=t.lo===t.lo,hasH=t.hi===t.hi; if(!hasL&&!hasH) continue;
+    let tested=0,f=0;
+    for(const i of o.idx){const v=t.vals[i];if(v!==v)continue;tested++;if((hasL&&v<t.lo)||(hasH&&v>t.hi))f++}
+    if(!tested) continue;
+    R.push({t,tested,f,rate:f/o.n*100,rt:f/tested*100});
+  }
+  R.sort((a,b)=>b.rate-a.rate||b.rt-a.rt);
+  return R;
+}
+function wdetail(w){
+  selW=w;
+  const o=WL.find(x=>x.w===w);
+  const bins={};o.idx.forEach(i=>bins[D.bin[i]]=(bins[D.bin[i]]||0)+1);
+  const bs=Object.entries(bins).sort((a,b)=>b[1]-a[1]).map(([b,c])=>`Bin${b}: ${c}`).join('、');
+  const R=wtests(o);
+  const mx=Math.max(...R.map(r=>r.rate),0.01);
+  $('wd').hidden=false;
+  $('wd').innerHTML=`<h2 style="font-size:16px;margin:0 0 4px">${w}</h2><p class="kv">良率 ${o.y.toFixed(2)}%（${o.p} / ${o.n}）；Bin 分布：${bs}</p><div class="tw"><table><thead><tr><th class="l">#</th><th class="l">測項</th><th>Spec (LSL ~ USL)</th><th>測試 die 數</th><th>Fail 數</th><th>Fail rate %（÷ 全 die，大 → 小）</th><th>Fail ÷ 測試 die %</th></tr></thead><tbody>${R.map((r,i)=>`<tr data-ti="${D.tests.indexOf(r.t)}" class="${selT===D.tests.indexOf(r.t)?'sel':''}"><td class="l">${i+1}</td><td class="l">${r.t.name}</td><td>${fmt(r.t.lo)} ~ ${fmt(r.t.hi)}</td><td>${r.tested}</td><td>${r.f}</td><td>${r.rate.toFixed(2)}${r.f?`<span class="bar" style="width:${r.rate/mx*120}px"></span>`:''}</td><td>${r.rt.toFixed(2)}</td></tr>`).join('')}</tbody></table></div><p class="note">Fail = 測量值超出該測項的 LSL / USL；只計有量測值的 die。沒有 spec limit 的測項不列入。排序依「Fail 數 ÷ 該片 wafer 全部 die」，避免只有少數 die 測到的項目被放大。</p><div class="hmbox" id="hm"><p class="kv">↓ 點選上方任一測項，這裡會顯示該測項在這片 wafer 的 die map heatmap。</p></div>`;
+  [...$('wt').tBodies[0].rows].forEach(r=>r.classList.toggle('sel',r.dataset.w===w));
+  if(selT!=null)hm();
+}
+$('wt').tBodies[0].addEventListener('click',e=>{const tr=e.target.closest('tr');if(!tr||!tr.dataset.w)return;wdetail(tr.dataset.w);$('wd').scrollIntoView({behavior:'smooth',block:'nearest'})});
+function tab(n){$('v1').hidden=n!==1;$('v2').hidden=n!==2;$('tab1').setAttribute('aria-selected',n===1);$('tab2').setAttribute('aria-selected',n===2)}
+$('tab1').onclick=()=>tab(1);$('tab2').onclick=()=>tab(2);
+
+/* ---------- heatmap ---------- */
+let selT=null,hmMode='val',hmFlip=false,hmVal=true;
+const vf=v=>Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);
+function rampA(f){
+  const s=[[49,104,193],[64,176,166],[246,214,76],[214,69,50]];
+  f=Math.max(0,Math.min(1,f));
+  const p=f*(s.length-1),i=Math.min(s.length-2,Math.floor(p)),u=p-i;
+  return s[i].map((c,k)=>Math.round(c+(s[i+1][k]-c)*u));
+}
+function ramp(f){return 'rgb('+rampA(f).join(',')+')'}
+function hm(){
+  const box=$('hm'); if(!box||selT==null) return;
+  const o=WL.find(x=>x.w===selW),t=D.tests[selT];
+  const hasL=t.lo===t.lo,hasH=t.hi===t.hi;
+  const pts=o.idx.map(i=>({x:D.x[i],y:D.y[i],v:t.vals[i],s:D.site[i],b:D.bin[i]}));
+  const vs=pts.map(p=>p.v).filter(v=>v===v).sort((a,b)=>a-b);
+  if(!vs.length){box.innerHTML='<p class="kv">此測項在這片 wafer 沒有量測值。</p>';return}
+  const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const lo=q(vs,.02),hi=q(vs,.98),span=(hi-lo)||1;
+  const c=Math.max(8,Math.min(28,Math.floor(780/(x1-x0+1)))),M=30,W=M+(x1-x0+1)*c+10,H=M+(y1-y0+1)*c+46;
+  const isF=v=>v===v&&((hasL&&v<t.lo)||(hasH&&v>t.hi));
+  let nf=0,s='';
+  for(const p of pts){
+    const f=isF(p.v); if(f)nf++;
+    const px=M+(p.x-x0)*c,py=M+(hmFlip?(y1-p.y):(p.y-y0))*c;
+    let fill='var(--line)',tc='var(--ink)';
+    if(p.v===p.v){ if(hmMode==='pf') fill=f?'var(--bad)':'var(--box)'; else {const a=rampA((p.v-lo)/span);fill=`rgb(${a})`;tc=(0.299*a[0]+0.587*a[1]+0.114*a[2])>150?'#111':'#fff'} }
+    s+=`<rect x="${px}" y="${py}" width="${c-1}" height="${c-1}" fill="${fill}"${hmMode==='val'&&f?' stroke="var(--ink)" stroke-width="1.5"':''}><title>(${p.x}, ${p.y}) Site ${p.s}, Bin ${p.b}, ${p.v===p.v?fmt(p.v):'未測'}</title></rect>`;
+    if(hmVal&&p.v===p.v){const tx=vf(p.v),fs=Math.min(11,(c-2)/(0.58*tx.length));if(fs>=6)s+=`<text x="${px+(c-1)/2}" y="${py+(c-1)/2+fs*0.35}" text-anchor="middle" style="fill:${tc};font-size:${fs}px;pointer-events:none">${tx}</text>`}
+  }
+  for(let x=x0;x<=x1;x++) if(x%5===0) s+=`<text x="${M+(x-x0)*c+c/2}" y="${M-6}" text-anchor="middle">${x}</text>`;
+  for(let y=y0;y<=y1;y++) if(y%5===0) s+=`<text x="${M-5}" y="${M+(hmFlip?(y1-y):(y-y0))*c+c*0.75}" text-anchor="end">${y}</text>`;
+  const ly=H-30;
+  if(hmMode==='val'){
+    s+=`<defs><linearGradient id="lg">${[0,.33,.67,1].map(f=>`<stop offset="${f}" stop-color="${ramp(f)}"/>`).join('')}</linearGradient></defs><rect x="${M}" y="${ly}" width="200" height="10" fill="url(#lg)"/><text x="${M}" y="${ly+22}">${fmt(lo)}</text><text x="${M+200}" y="${ly+22}" text-anchor="end">${fmt(hi)}</text><text x="${M+210}" y="${ly+9}">色階取 2%~98% 分位；黑框 = 超出 spec</text>`;
+  } else s+=`<rect x="${M}" y="${ly}" width="10" height="10" fill="var(--box)"/><text x="${M+14}" y="${ly+9}">Pass</text><rect x="${M+60}" y="${ly}" width="10" height="10" fill="var(--bad)"/><text x="${M+74}" y="${ly+9}">Fail</text><rect x="${M+120}" y="${ly}" width="10" height="10" fill="var(--line)"/><text x="${M+134}" y="${ly+9}">未測</text>`;
+  box.innerHTML=`<h3 style="font-size:15px;margin:0 0 4px">Heatmap：${t.name} — ${selW}</h3><p class="kv">Spec ${fmt(t.lo)} ~ ${fmt(t.hi)}；測試 ${vs.length} 顆，超出 spec ${nf} 顆</p><div class="ctl"><label>顯示 <select id="hmm"><option value="val"${hmMode==='val'?' selected':''}>數值色階</option><option value="pf"${hmMode==='pf'?' selected':''}>Pass / Fail</option></select></label><label><input type="checkbox" id="hmf"${hmFlip?' checked':''}> Y 軸反向</label><label><input type="checkbox" id="hmv"${hmVal?' checked':''}> 顯示數值</label></div><div class="tw"><svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,420)}px" role="img" aria-label="${t.name} die map">${s}</svg></div>`;
+  $('hmm').onchange=e=>{hmMode=e.target.value;hm()};
+  $('hmf').onchange=e=>{hmFlip=e.target.checked;hm()};
+  $('hmv').onchange=e=>{hmVal=e.target.checked;hm()};
+}
+$('wd').addEventListener('click',e=>{
+  const tr=e.target.closest('tr[data-ti]'); if(!tr) return;
+  selT=+tr.dataset.ti;
+  $('wd').querySelectorAll('tr[data-ti]').forEach(r=>r.classList.toggle('sel',r===tr));
+  hm(); $('hm').scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+
+/* ---------- Excel export ---------- */
+function sheet(a){
+  const ws=XLSX.utils.aoa_to_sheet(a),w=[];
+  a.forEach(r=>r.forEach((v,i)=>{w[i]=Math.max(w[i]||8,Math.min(40,String(v==null?'':v).length+2))}));
+  ws['!cols']=w.map(x=>({wch:x}));return ws;
+}
+async function saveX(wb,name){
+  if(typeof XLSX==='undefined'){$('msg').textContent='Excel 元件載入失敗，請確認網路後重新整理。';return}
+  const dl=(typeof claude!=='undefined'&&claude.use)?await claude.use('downloads'):null;
+  if(!dl){$('msg').textContent='此環境不支援下載 Excel，請在 claude.ai 開啟此頁面。';return}
+  try{await dl.save({filename:name,data:XLSX.write(wb,{type:'array',bookType:'xlsx'})});$('msg').textContent='已匯出 '+name}
+  catch(e){if(!e||e.code!=='declined')$('msg').textContent='匯出失敗：'+((e&&e.message)||e)}
+}
+const r4=v=>v===v?+(+v).toFixed(4):'';
+$('xs').onclick=()=>{
+  if(!D||!rows.length) return;
+  const lot=$('lot').value||'ALL',v=[...rows].sort((a,b)=>b.score-a.score);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,sheet([['測項','單位','LSL','USL','N','偏離最大 site','該 site 偏移','Δ (中位數 max-min)','σ (site 內)','Δ/σ','Δ/Spec %','η²','判定']].concat(v.map(r=>[r.t.name,r.t.unit,r4(r.t.lo),r4(r.t.hi),r.N,'Site '+r.worst,r4(r.off),r4(r.delta),r4(r.sp),r.score>=999?'inf':r4(r.score),r4(r.specPct),r4(r.eta),['正常','注意','過大'][r.flag]]))),'Site_Difference');
+  const st=[['測項','Site','N','中位數','平均','σ','Q1','Q3','鬚下限','鬚上限','超出 spec 顆數']];
+  v.forEach(r=>r.st.forEach(o=>st.push([r.t.name,'Site '+o.site,o.n,r4(o.med),r4(o.mean),r4(o.sd),r4(o.q1),r4(o.q3),r4(o.wl),r4(o.wh),o.f])));
+  XLSX.utils.book_append_sheet(wb,sheet(st),'Site_Stats');
+  XLSX.utils.book_append_sheet(wb,sheet([['項目','設定'],['Lot',lot],['只算 Bin1 good die',$('b1').checked?'是':'否'],['Δ/σ 門檻',+$('t1').value],['Δ/Spec 門檻 %',+$('t2').value],['說明','Δ = 各 site 中位數最大值減最小值；σ = site 內合併標準差；η² = site 解釋的變異比例']]),'Info');
+  saveX(wb,`site_difference_${lot}.xlsx`);
+};
+$('xw').onclick=()=>{
+  if(!D||!WL.length) return;
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,sheet([['#','Wafer','Lot','Die 數','Pass (Bin1)','Fail','良率 %']].concat(WL.map((o,i)=>[i+1,o.w,o.lot,o.n,o.p,o.n-o.p,r4(o.y)]))),'Wafer_Yield');
+  const L=[['Wafer','測項','LSL','USL','測試 die 數','Fail 數','Fail rate % (÷ 全 die)','Fail ÷ 測試 die %']],M=new Map();
+  const names=D.tests.filter(t=>t.lo===t.lo||t.hi===t.hi).map(t=>t.name);
+  for(const o of WL){const R=wtests(o);R.forEach(r=>L.push([o.w,r.t.name,r4(r.t.lo),r4(r.t.hi),r.tested,r.f,r4(r.rate),r4(r.rt)]));M.set(o.w,new Map(R.map(r=>[r.t.name,r4(r.rate)])))}
+  XLSX.utils.book_append_sheet(wb,sheet(L),'Fail_Rate_Long');
+  XLSX.utils.book_append_sheet(wb,sheet([['Wafer（Fail rate %）'].concat(names)].concat(WL.map(o=>[o.w].concat(names.map(n=>M.get(o.w).has(n)?M.get(o.w).get(n):''))))),'Fail_Rate_Matrix');
+  if(selW&&selT!=null){
+    const o=WL.find(x=>x.w===selW),t=D.tests[selT],hasL=t.lo===t.lo,hasH=t.hi===t.hi;
+    const dm=[[`${selW} / ${t.name}`,'','','','',''],['X','Y','Site','Bin','值','結果']];
+    o.idx.forEach(i=>{const v=t.vals[i];dm.push([D.x[i],D.y[i],D.site[i],D.bin[i],r4(v),v!==v?'未測':((hasL&&v<t.lo)||(hasH&&v>t.hi)?'Fail':'Pass')])});
+    XLSX.utils.book_append_sheet(wb,sheet(dm),'Heatmap_DieMap');
+  }
+  saveX(wb,'wafer_yield_fail_rate.xlsx');
+};
+
+/* ---------- events ---------- */
+const drop=$('drop');
+drop.onclick=()=>$('file').click();
+drop.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click()}};
+$('file').onchange=e=>load([...e.target.files]);
+['dragover','dragenter'].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.add('on')}));
+['dragleave','drop'].forEach(n=>drop.addEventListener(n,e=>{e.preventDefault();drop.classList.remove('on')}));
+drop.addEventListener('drop',e=>load([...e.dataTransfer.files]));
+['lot','b1'].forEach(i=>$(i).onchange=analyze);
+['t1','t2','only'].forEach(i=>$(i).oninput=render);
+$('tb').tHead.addEventListener('click',e=>{const k=e.target.closest('th')?.dataset.k;if(!k)return;sortDir=sortKey===k?-sortDir:-1;sortKey=k;render()});
+$('tb').tBodies[0].addEventListener('click',e=>{const tr=e.target.closest('tr');if(!tr||!tr.dataset.n)return;selTest=tr.dataset.n;render();$('detail').scrollIntoView({behavior:'smooth',block:'nearest'})});
+</script>
+</body>
+</html>
