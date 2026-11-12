@@ -45,6 +45,7 @@ svg text{fill:var(--mute);font-size:11px}
 .bar.y{background:var(--box)}
 .scr{max-height:380px;overflow:auto}
 .kv{color:var(--mute);margin:0 0 10px}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:6px;display:none;max-width:90%;z-index:20}
 .btn{font:inherit;background:var(--acc);color:var(--panel);border:0;border-radius:4px;padding:5px 12px;cursor:pointer}
 .btn:hover{opacity:.9}
 #wd tr[data-ti]{cursor:pointer}
@@ -92,6 +93,7 @@ svg text{fill:var(--mute);font-size:11px}
  </div>
  <div class="panel" id="wd" hidden></div>
 </div>
+<div id="toast" role="status"></div>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -350,10 +352,18 @@ function sheet(a){
   a.forEach(r=>r.forEach((v,i)=>{w[i]=Math.max(w[i]||8,Math.min(40,String(v==null?'':v).length+2))}));
   ws['!cols']=w.map(x=>({wch:x}));return ws;
 }
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>e.style.display='none',6000)}
+window.addEventListener('error',e=>toast('發生錯誤：'+e.message));
 async function saveX(wb,name){
+  const $=id=>id==='msg'?{set textContent(v){toast(v)}}:document.getElementById(id);
+  toast('產生 Excel 中…');
   if(typeof XLSX==='undefined'){$('msg').textContent='Excel 元件載入失敗，請確認網路後重新整理。';return}
   const dl=(typeof claude!=='undefined'&&claude.use)?await claude.use('downloads'):null;
-  if(!dl){$('msg').textContent='此環境不支援下載 Excel，請在 claude.ai 開啟此頁面。';return}
+  if(!dl){
+    try{const b=new Blob([XLSX.write(wb,{type:'array',bookType:'xlsx'})],{type:'application/octet-stream'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();a.remove();
+      $('msg').textContent='無法使用 claude.ai 下載功能，已改用瀏覽器下載 '+name+'。若沒有檔案出現，表示此環境阻擋下載，請在 claude.ai 內用登入帳號開啟。'}
+    catch(e){$('msg').textContent='此環境不支援下載 Excel：'+e.message}
+    return}
   try{await dl.save({filename:name,data:XLSX.write(wb,{type:'array',bookType:'xlsx'})});$('msg').textContent='已匯出 '+name}
   catch(e){if(!e||e.code!=='declined')$('msg').textContent='匯出失敗：'+((e&&e.message)||e)}
 }
