@@ -298,7 +298,7 @@ function tab(n){$('v1').hidden=n!==1;$('v2').hidden=n!==2;$('tab1').setAttribute
 $('tab1').onclick=()=>tab(1);$('tab2').onclick=()=>tab(2);
 
 /* ---------- heatmap ---------- */
-let selT=null,hmMode='val',hmFlip=false,hmVal=true;
+let selT=null,hmMode='val',hmFlip=false,hmVal=true,hmSite=false;
 const vf=v=>Math.abs(v)>=100?v.toFixed(0):Math.abs(v)>=10?v.toFixed(1):v.toFixed(2);
 function rampA(f){
   const s=[[49,104,193],[64,176,166],[246,214,76],[214,69,50]];
@@ -326,6 +326,7 @@ function hm(){
     let fill='var(--line)',tc='var(--ink)';
     if(p.v===p.v){ if(hmMode==='pf') fill=f?'var(--bad)':'var(--box)'; else {const a=rampA((p.v-lo)/span);fill=`rgb(${a})`;tc=(0.299*a[0]+0.587*a[1]+0.114*a[2])>150?'#111':'#fff'} }
     s+=`<rect x="${px}" y="${py}" width="${c-1}" height="${c-1}" fill="${fill}"${hmMode==='val'&&f?' stroke="var(--ink)" stroke-width="1.5"':''}><title>(${p.x}, ${p.y}) Site ${p.s}, Bin ${p.b}, ${p.v===p.v?fmt(p.v):'未測'}</title></rect>`;
+    if(hmSite){const both=hmVal&&p.v===p.v,lb='S'+p.s,f2=both?7:Math.min(11,(c-2)/(0.58*lb.length));if(f2>=5&&(!both||c>=18))s+=`<text x="${both?px+2:px+(c-1)/2}" y="${both?py+8:py+(c-1)/2+f2*0.35}" text-anchor="${both?'start':'middle'}" style="fill:${tc};font-size:${f2}px;pointer-events:none;${both?'opacity:.8':''}">${lb}</text>`}
     if(hmVal&&p.v===p.v){const tx=vf(p.v),fs=Math.min(11,(c-2)/(0.58*tx.length));if(fs>=6)s+=`<text x="${px+(c-1)/2}" y="${py+(c-1)/2+fs*0.35}" text-anchor="middle" style="fill:${tc};font-size:${fs}px;pointer-events:none">${tx}</text>`}
   }
   for(let x=x0;x<=x1;x++) if(x%5===0) s+=`<text x="${M+(x-x0)*c+c/2}" y="${M-6}" text-anchor="middle">${x}</text>`;
@@ -334,10 +335,11 @@ function hm(){
   if(hmMode==='val'){
     s+=`<defs><linearGradient id="lg">${[0,.33,.67,1].map(f=>`<stop offset="${f}" stop-color="${ramp(f)}"/>`).join('')}</linearGradient></defs><rect x="${M}" y="${ly}" width="200" height="10" fill="url(#lg)"/><text x="${M}" y="${ly+22}">${fmt(lo)}</text><text x="${M+200}" y="${ly+22}" text-anchor="end">${fmt(hi)}</text><text x="${M+210}" y="${ly+9}">色階取 2%~98% 分位；黑框 = 超出 spec</text>`;
   } else s+=`<rect x="${M}" y="${ly}" width="10" height="10" fill="var(--box)"/><text x="${M+14}" y="${ly+9}">Pass</text><rect x="${M+60}" y="${ly}" width="10" height="10" fill="var(--bad)"/><text x="${M+74}" y="${ly+9}">Fail</text><rect x="${M+120}" y="${ly}" width="10" height="10" fill="var(--line)"/><text x="${M+134}" y="${ly+9}">未測</text>`;
-  box.innerHTML=`<h3 style="font-size:15px;margin:0 0 4px">Heatmap：${t.name} — ${selW}</h3><p class="kv">Spec ${fmt(t.lo)} ~ ${fmt(t.hi)}；測試 ${vs.length} 顆，超出 spec ${nf} 顆</p><div class="ctl"><label>顯示 <select id="hmm"><option value="val"${hmMode==='val'?' selected':''}>數值色階</option><option value="pf"${hmMode==='pf'?' selected':''}>Pass / Fail</option></select></label><label><input type="checkbox" id="hmf"${hmFlip?' checked':''}> Y 軸反向</label><label><input type="checkbox" id="hmv"${hmVal?' checked':''}> 顯示數值</label></div><div class="tw"><svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,420)}px" role="img" aria-label="${t.name} die map">${s}</svg></div>`;
+  box.innerHTML=`<h3 style="font-size:15px;margin:0 0 4px">Heatmap：${t.name} — ${selW}</h3><p class="kv">Spec ${fmt(t.lo)} ~ ${fmt(t.hi)}；測試 ${vs.length} 顆，超出 spec ${nf} 顆</p><div class="ctl"><label>顯示 <select id="hmm"><option value="val"${hmMode==='val'?' selected':''}>數值色階</option><option value="pf"${hmMode==='pf'?' selected':''}>Pass / Fail</option></select></label><label><input type="checkbox" id="hmf"${hmFlip?' checked':''}> Y 軸反向</label><label><input type="checkbox" id="hmv"${hmVal?' checked':''}> 顯示數值</label><label><input type="checkbox" id="hms"${hmSite?' checked':''}> 顯示 Site#</label></div><div class="tw"><svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,420)}px" role="img" aria-label="${t.name} die map">${s}</svg></div>`;
   $('hmm').onchange=e=>{hmMode=e.target.value;hm()};
   $('hmf').onchange=e=>{hmFlip=e.target.checked;hm()};
   $('hmv').onchange=e=>{hmVal=e.target.checked;hm()};
+  $('hms').onchange=e=>{hmSite=e.target.checked;hm()};
 }
 $('wd').addEventListener('click',e=>{
   const tr=e.target.closest('tr[data-ti]'); if(!tr) return;
